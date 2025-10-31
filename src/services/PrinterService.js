@@ -1,5 +1,4 @@
 const { SerialPort } = require('serialport');
-const { ThermalPrinter, PrinterTypes, CharacterSet } = require('node-thermal-printer');
 const Jimp = require('jimp');
 const fs = require('fs');
 const path = require('path');
@@ -145,172 +144,13 @@ class PrinterService {
 
   async printThermalReceiptSerial(printer, receiptData) {
     return new Promise((resolve) => {
-      try {
-        console.log(`Printing to thermal printer: ${printer.path}`);
-        
-        // Create thermal printer instance
-        const thermalPrinter = new ThermalPrinter({
-          type: PrinterTypes.EPSON,
-          interface: printer.path,
-          characterSet: CharacterSet.JAPAN,
-          removeSpecialCharacters: false,
-          lineCharacter: "=",
-          options: {
-            timeout: 5000,
-            baudRate: 9600
-          }
-        });
-
-        thermalPrinter.isPrinterConnected().then(async (isConnected) => {
-          if (!isConnected) {
-            resolve({ 
-              success: false, 
-              message: 'Cannot connect to thermal printer. Check connection and try again.' 
-            });
-            return;
-          }
-
-          try {
-            // Clear any previous content
-            thermalPrinter.clear();
-            
-            // Print logo image if exists
-            await this.printImageToThermal(thermalPrinter, receiptData);
-            
-            // Print header
-            thermalPrinter.alignCenter();
-            thermalPrinter.setTextSize(2, 2);
-            thermalPrinter.bold(true);
-            thermalPrinter.println(receiptData.title || 'レシート');
-            thermalPrinter.bold(false);
-            thermalPrinter.setTextNormal();
-            
-            // Print separator
-            thermalPrinter.drawLine();
-            
-            // Print items
-            this.printItemsToThermal(thermalPrinter, receiptData.items);
-            
-            // Print separator
-            thermalPrinter.drawLine();
-            
-            // Print total
-            thermalPrinter.alignRight();
-            thermalPrinter.bold(true);
-            thermalPrinter.setTextSize(1, 2);
-            thermalPrinter.println(`合計: ¥${receiptData.total || 0}`);
-            thermalPrinter.bold(false);
-            thermalPrinter.setTextNormal();
-            
-            // Print footer
-            this.printFooterToThermal(thermalPrinter);
-            
-            // Execute print
-            const result = await thermalPrinter.execute();
-            console.log('Print result:', result);
-            
-            resolve({ 
-              success: true, 
-              message: 'Receipt printed successfully to thermal printer!' 
-            });
-            
-          } catch (printError) {
-            console.error('Print execution error:', printError);
-            resolve({ 
-              success: false, 
-              message: `Printing failed: ${printError.message}` 
-            });
-          }
-        }).catch(connectionError => {
-          console.error('Connection error:', connectionError);
-          resolve({ 
-            success: false, 
-            message: `Connection failed: ${connectionError.message}` 
-          });
-        });
-        
-      } catch (error) {
-        console.error('Thermal printing setup error:', error);
-        resolve({ 
-          success: false, 
-          message: `Thermal printing setup failed: ${error.message}` 
-        });
-      }
+      resolve({ 
+        success: false, 
+        message: 'Thermal printer via Serial/Bluetooth is not supported in this version.' 
+      });
     });
   }
 
-  async printImageToThermal(thermalPrinter, receiptData) {
-    try {
-      let imagePath = null;
-      const tempImagePath = path.join(__dirname, '../../temp-receipt-image.png');
-      
-      if (receiptData.image) {
-        // If image data is provided from React app
-        const base64Data = receiptData.image.replace(/^data:image\/[a-z]+;base64,/, '');
-        fs.writeFileSync(tempImagePath, base64Data, 'base64');
-        imagePath = tempImagePath;
-      } else {
-        // Use default logo
-        const logoPath = path.join(__dirname, '../assets/cafe-logo.svg');
-        if (fs.existsSync(logoPath)) {
-          imagePath = logoPath;
-        }
-      }
-      
-      if (imagePath) {
-        // Resize image for thermal printer (57mm width ≈ 200-300 pixels)
-        await Jimp.read(imagePath)
-          .then(img => img.resize(200, Jimp.AUTO).quality(100))
-          .then(img => img.writeAsync(tempImagePath));
-        
-        await thermalPrinter.printImage(tempImagePath);
-        thermalPrinter.newLine();
-        
-        // Clean up temp file
-        if (fs.existsSync(tempImagePath)) {
-          fs.unlinkSync(tempImagePath);
-        }
-      }
-    } catch (imageError) {
-      console.log('Could not print image:', imageError.message);
-      // Continue without image
-    }
-  }
-
-  printItemsToThermal(thermalPrinter, items) {
-    thermalPrinter.alignLeft();
-    if (items && items.length > 0) {
-      items.forEach(item => {
-        const itemLine = `${item.name}`;
-        const priceLine = `¥${item.price}`;
-        
-        // Print item name
-        thermalPrinter.println(itemLine);
-        // Print price aligned right
-        thermalPrinter.alignRight();
-        thermalPrinter.println(priceLine);
-        thermalPrinter.alignLeft();
-      });
-    }
-  }
-
-  printFooterToThermal(thermalPrinter) {
-    thermalPrinter.alignCenter();
-    thermalPrinter.println('');
-    thermalPrinter.println('ありがとうございました');
-    thermalPrinter.println('');
-    
-    // Print date/time
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('ja-JP');
-    const timeStr = now.toLocaleTimeString('ja-JP');
-    thermalPrinter.println(`${dateStr} ${timeStr}`);
-    
-    // Cut paper
-    thermalPrinter.newLine();
-    thermalPrinter.newLine();
-    thermalPrinter.cut();
-  }
 
   async printSystemPrinter(printerId, receiptHTML) {
     const { BrowserWindow } = require('electron');
